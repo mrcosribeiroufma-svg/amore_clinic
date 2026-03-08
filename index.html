@@ -157,12 +157,6 @@
     .appt-time .d { font-size:10px; font-weight:700; }
 
     .blood-pill { background:var(--lilac-light); color:var(--lilac-dark); padding:2px 9px; border-radius:99px; font-size:12px; font-weight:800; }
-    .btn-wa{background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;}
-    .btn-wa:active{opacity:.85;}
-    .wa-header{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#25d36622,#128c7e11);border:1.5px solid #25d36633;border-radius:16px;padding:16px;margin-bottom:16px;}
-    .wa-icon{font-size:32px;line-height:1;}
-    .wa-tip{background:#f8f4ff;border:1.5px solid #e0d5f5;border-radius:14px;padding:14px;font-size:12px;color:var(--muted);margin-top:16px;line-height:1.6;}
-    .badge-dot{background:#e8829a;color:#fff;border-radius:999px;font-size:9px;padding:1px 4px;vertical-align:super;margin-left:1px;line-height:1;}
   </style>
 </head>
 <body>
@@ -305,118 +299,11 @@ function modalAppointment(){
   </div></div>`;
 }
 
-function buildWhatsAppMsg(appt, patient) {
-  const dateStr = fmtDateFull(appt.date);
-  return `Olá, ${patient.guardian}! 👋\n\nPassando para confirmar a sessão de *${patient.name}* na *Amoré – Núcleo de Linguagem Infantil*:\n\n📅 *Data:* ${dateStr}\n⏰ *Horário:* ${appt.time}\n👩‍⚕️ *Terapeuta:* ${appt.doctor}\n📋 *Especialidade:* ${appt.specialty}\n\nPor favor, confirme a presença respondendo esta mensagem.\n\nEm caso de dúvidas, estamos à disposição! 💜`;
-}
-
-function openWhatsApp(phone, msg) {
-  const clean = phone.replace(/\D/g, "");
-  const num = clean.startsWith("55") ? clean : "55" + clean;
-  const url = `https://wa.me/${num}?text=${encodeURIComponent(msg)}`;
-  window.open(url, "_blank");
-}
-
-function pageWhatsApp() {
-  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
-  const tomorrowStr = tomorrow.toISOString().split("T")[0];
-  const todayStr = today();
-  const tab = state.waTab || "today";
-
-  const filterDate = tab === "today" ? todayStr : tomorrowStr;
-  const filterLabel = tab === "today" ? "Hoje" : "Amanhã";
-  const appts = state.appointments
-    .filter(a => a.date === filterDate && a.status !== "Cancelado" && a.status !== "Realizado")
-    .sort((a,b) => a.time.localeCompare(b.time));
-
-  const sentSet = state.waSent || {};
-
-  const rows = appts.map(a => {
-    const p = getPatient(a.patientId);
-    if (!p) return "";
-    const sent = sentSet[a.id];
-    const msg = buildWhatsAppMsg(a, p);
-    return `<div class="list-row" style="align-items:flex-start;flex-wrap:wrap;gap:6px">
-      <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
-        ${avatar(p.name, 40)}
-        <div class="row-info">
-          <div class="row-name">${p.name}</div>
-          <div class="row-sub">${a.time} · ${a.specialty}</div>
-          <div class="row-sub">${p.guardian} · ${p.phone}</div>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
-        ${badge(a.status)}
-        <button class="btn ${sent?"btn-ghost":"btn-wa"}" style="font-size:12px;padding:6px 12px" onclick="sendWA(${a.id})">
-          ${sent ? "✅ Enviado" : "📲 Enviar"}
-        </button>
-      </div>
-    </div>`;
-  }).join("");
-
-  const pendingCount = appts.filter(a => !(sentSet[a.id])).length;
-
-  return `<div class="page">
-    <div class="wa-header">
-      <div class="wa-icon">💬</div>
-      <div>
-        <div style="font-weight:700;font-size:16px;color:var(--text)">Confirmações WhatsApp</div>
-        <div style="font-size:12px;color:var(--muted)">${pendingCount} mensagen${pendingCount!==1?"s":""}${pendingCount>0?" a enviar":" – tudo enviado!"}</div>
-      </div>
-    </div>
-
-    <div class="pills" style="margin-bottom:14px">
-      <button class="pill${tab==="today"?" active":""}" onclick="setState({waTab:'today'})">📅 Hoje</button>
-      <button class="pill${tab==="tomorrow"?" active":""}" onclick="setState({waTab:'tomorrow'})">🗓️ Amanhã</button>
-    </div>
-
-    ${appts.length === 0
-      ? `<div class="empty-state"><div class="empty-icon">✅</div>Sem sessões ${filterLabel.toLowerCase()} para confirmar!</div>`
-      : `<div class="card">${rows}</div>
-         ${pendingCount > 0
-           ? `<button class="btn btn-wa btn-full" style="margin-top:14px" onclick="sendAllWA('${filterDate}')">📲 Enviar Todas (${pendingCount})</button>`
-           : `<div style="text-align:center;padding:14px;color:#56c79a;font-weight:600">✅ Todas as mensagens foram enviadas!</div>`
-         }`
-    }
-
-    <div class="wa-tip">
-      💡 <strong>Como funciona:</strong> ao clicar em "Enviar", o WhatsApp abre automaticamente com a mensagem pronta. Basta tocar em enviar!
-    </div>
-  </div>`;
-}
-
-function sendWA(apptId) {
-  const a = state.appointments.find(x => x.id === apptId);
-  const p = getPatient(a.patientId);
-  if (!p || !p.phone) { showToast("Telefone não cadastrado!", "error"); return; }
-  const msg = buildWhatsAppMsg(a, p);
-  openWhatsApp(p.phone, msg);
-  const waSent = { ...(state.waSent || {}), [apptId]: true };
-  setState({ waSent });
-  showToast(`Mensagem aberta para ${p.guardian}!`);
-}
-
-function sendAllWA(dateStr) {
-  const appts = state.appointments.filter(a => a.date === dateStr && a.status !== "Cancelado" && a.status !== "Realizado");
-  const unsent = appts.filter(a => !(state.waSent || {})[a.id]);
-  if (unsent.length === 0) { showToast("Tudo já foi enviado!", "error"); return; }
-  let idx = 0;
-  const waSent = { ...(state.waSent || {}) };
-  function next() {
-    if (idx >= unsent.length) { setState({ waSent }); showToast(`${unsent.length} mensagen${unsent.length!==1?"s":""} abertas!`); return; }
-    const a = unsent[idx];
-    const p = getPatient(a.patientId);
-    if (p && p.phone) { const msg = buildWhatsAppMsg(a, p); openWhatsApp(p.phone, msg); waSent[a.id] = true; }
-    idx++; setTimeout(next, 1200);
-  }
-  next();
-}
-
 function render(){
-  const pages={dashboard:pageDashboard,patients:pagePatients,appointments:pageAppointments,whatsapp:pageWhatsApp};
-  const icons={dashboard:"🏠",patients:"👶",appointments:"📅",whatsapp:"💬"};
+  const pages={dashboard:pageDashboard,patients:pagePatients,appointments:pageAppointments};
+  const titles={dashboard:"Início",patients:state.selectedPatient?"Perfil":"Pacientes",appointments:"Atendimentos"};
+  const icons={dashboard:"🏠",patients:"👶",appointments:"📅"};
   const todayCount=state.appointments.filter(a=>a.date===today()).length;
-  const waPending=state.appointments.filter(a=>(a.date===today()||a.date===new Date(Date.now()+86400000).toISOString().split("T")[0])&&a.status!=="Cancelado"&&a.status!=="Realizado"&&!(state.waSent||{})[a.id]).length;
   document.getElementById("app").innerHTML=`
     <div class="top-bar">
       <img class="top-bar-logo" src="data:image/png;base64,${LOGO_B64}" alt="Amoré"/>
@@ -427,7 +314,7 @@ function render(){
     </div>
     ${(pages[state.page]||pageDashboard)()}
     <nav class="bottom-nav">
-      ${["dashboard","patients","appointments","whatsapp"].map(p=>`<button class="nav-item${state.page===p?" active":""}" onclick="goPage('${p}')"><span class="icon">${icons[p]}${p==="whatsapp"&&waPending>0?`<sup class="badge-dot">${waPending}</sup>`:""}</span><span class="label">${p==="dashboard"?"Início":p==="patients"?"Pacientes":p==="appointments"?"Agenda":"WhatsApp"}</span></button>`).join("")}
+      ${["dashboard","patients","appointments"].map(p=>`<button class="nav-item${state.page===p?" active":""}" onclick="goPage('${p}')"><span class="icon">${icons[p]}</span><span class="label">${p==="dashboard"?"Início":p==="patients"?"Pacientes":"Agenda"}</span></button>`).join("")}
     </nav>
     ${state.modal==="patient"?modalPatient():""}
     ${state.modal==="appointment"?modalAppointment():""}
