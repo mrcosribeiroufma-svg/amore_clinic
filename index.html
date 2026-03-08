@@ -176,19 +176,46 @@ const STATUS_LIST = ["Pendente","Confirmado","Realizado","Cancelado"];
 const STATUS_COLOR = {Confirmado:"#56c79a",Pendente:"#f4a94e",Cancelado:"#ef6b6b",Realizado:"#9b72cf"};
 const AVATAR_COLORS = ["#c384a8","#9b72cf","#7db8e8","#6fcf97","#f4a94e","#e8829a","#7e57c2","#56c79a"];
 
+const DEFAULT_PATIENTS = [
+  {id:1,name:"Sofia Martins",dob:"2019-03-15",guardian:"Ana Martins",phone:"(11) 98765-4321",email:"ana@email.com",blood:"A+",allergies:"Nenhuma",notes:"",createdAt:"2024-01-10"},
+  {id:2,name:"Lucas Ferreira",dob:"2020-07-22",guardian:"Pedro Ferreira",phone:"(11) 91234-5678",email:"pedro@email.com",blood:"O-",allergies:"Nenhuma",notes:"",createdAt:"2024-02-05"},
+  {id:3,name:"Isabella Santos",dob:"2017-11-08",guardian:"Carla Santos",phone:"(11) 93456-7890",email:"carla@email.com",blood:"B+",allergies:"Dipirona",notes:"Em acompanhamento",createdAt:"2024-03-12"},
+];
+const DEFAULT_APPOINTMENTS = [
+  {id:1,patientId:1,date:"2026-03-10",time:"09:00",doctor:"Fga. Ana Souza",specialty:"Fonoaudiologia",status:"Realizado",notes:""},
+  {id:2,patientId:2,date:"2026-03-15",time:"10:30",doctor:"Fga. Carla Lima",specialty:"Linguagem",status:"Confirmado",notes:"Retorno"},
+  {id:3,patientId:3,date:"2026-03-20",time:"14:00",doctor:"Fga. Fernanda Costa",specialty:"Motricidade Orofacial",status:"Pendente",notes:"Primeira consulta"},
+  {id:4,patientId:1,date:"2026-03-25",time:"11:00",doctor:"Fga. Ana Souza",specialty:"Fonoaudiologia",status:"Confirmado",notes:""},
+];
+
+function loadStorage() {
+  try {
+    const p = localStorage.getItem("amore_patients");
+    const a = localStorage.getItem("amore_appointments");
+    const w = localStorage.getItem("amore_waSent");
+    return {
+      patients: p ? JSON.parse(p) : DEFAULT_PATIENTS,
+      appointments: a ? JSON.parse(a) : DEFAULT_APPOINTMENTS,
+      waSent: w ? JSON.parse(w) : {}
+    };
+  } catch(e) { return {patients:DEFAULT_PATIENTS, appointments:DEFAULT_APPOINTMENTS, waSent:{}}; }
+}
+
+function saveStorage() {
+  try {
+    localStorage.setItem("amore_patients", JSON.stringify(state.patients));
+    localStorage.setItem("amore_appointments", JSON.stringify(state.appointments));
+    localStorage.setItem("amore_waSent", JSON.stringify(state.waSent||{}));
+  } catch(e) {}
+}
+
+const stored = loadStorage();
 let state = {
-  page:"dashboard", patients:[
-    {id:1,name:"Sofia Martins",dob:"2019-03-15",guardian:"Ana Martins",phone:"(11) 98765-4321",email:"ana@email.com",blood:"A+",allergies:"Nenhuma",notes:"",createdAt:"2024-01-10"},
-    {id:2,name:"Lucas Ferreira",dob:"2020-07-22",guardian:"Pedro Ferreira",phone:"(11) 91234-5678",email:"pedro@email.com",blood:"O-",allergies:"Nenhuma",notes:"",createdAt:"2024-02-05"},
-    {id:3,name:"Isabella Santos",dob:"2017-11-08",guardian:"Carla Santos",phone:"(11) 93456-7890",email:"carla@email.com",blood:"B+",allergies:"Dipirona",notes:"Em acompanhamento",createdAt:"2024-03-12"},
-  ],
-  appointments:[
-    {id:1,patientId:1,date:"2026-03-10",time:"09:00",doctor:"Fga. Ana Souza",specialty:"Fonoaudiologia",status:"Realizado",notes:""},
-    {id:2,patientId:2,date:"2026-03-15",time:"10:30",doctor:"Fga. Carla Lima",specialty:"Linguagem",status:"Confirmado",notes:"Retorno"},
-    {id:3,patientId:3,date:"2026-03-20",time:"14:00",doctor:"Fga. Fernanda Costa",specialty:"Motricidade Orofacial",status:"Pendente",notes:"Primeira consulta"},
-    {id:4,patientId:1,date:"2026-03-25",time:"11:00",doctor:"Fga. Ana Souza",specialty:"Fonoaudiologia",status:"Confirmado",notes:""},
-  ],
-  search:"", filterStatus:"Todos", selectedPatient:null, modal:null, editingId:null, form:{}, toast:null
+  page:"dashboard",
+  patients: stored.patients,
+  appointments: stored.appointments,
+  waSent: stored.waSent,
+  search:"", filterStatus:"Todos", selectedPatient:null, modal:null, editingId:null, form:{}, toast:null, waTab:"today"
 };
 
 function calcAge(dob){const b=new Date(dob),n=new Date();let y=n.getFullYear()-b.getFullYear();if(n.getMonth()<b.getMonth()||(n.getMonth()===b.getMonth()&&n.getDate()<b.getDate()))y--;return y;}
@@ -199,7 +226,7 @@ function fmtDateFull(d){return new Date(d+"T12:00").toLocaleDateString("pt-BR",{
 function getPatient(id){return state.patients.find(p=>p.id===parseInt(id));}
 function today(){return new Date().toISOString().split("T")[0];}
 function newId(){return Date.now();}
-function setState(patch){Object.assign(state,patch);render();}
+function setState(patch){Object.assign(state,patch);saveStorage();render();}
 function showToast(msg,type="success"){setState({toast:{msg,type}});setTimeout(()=>setState({toast:null}),2800);}
 
 function avatar(name,size=40){
@@ -447,9 +474,9 @@ function savePatient(){
   if(!f.name||!f.dob||!f.guardian){showToast("Preencha os campos obrigatórios","error");return;}
   if(state.editingId){state.patients=state.patients.map(p=>p.id===state.editingId?{...p,...f}:p);if(state.selectedPatient?.id===state.editingId)state.selectedPatient={...state.selectedPatient,...f};showToast("Paciente atualizado!");}
   else{state.patients=[...state.patients,{...f,id:newId(),createdAt:today()}];showToast("Paciente cadastrado!");}
-  state.modal=null;render();
+  state.modal=null;saveStorage();render();
 }
-function deletePatient(id){state.patients=state.patients.filter(p=>p.id!==id);state.appointments=state.appointments.filter(a=>a.patientId!==id);state.modal=null;state.selectedPatient=null;showToast("Paciente removido");}
+function deletePatient(id){state.patients=state.patients.filter(p=>p.id!==id);state.appointments=state.appointments.filter(a=>a.patientId!==id);state.modal=null;state.selectedPatient=null;saveStorage();showToast("Paciente removido");}
 function openNewAppointment(patientId=null){setState({modal:"appointment",editingId:null,form:{patientId:patientId||"",specialty:"Fonoaudiologia",status:"Pendente"}});}
 function openEditAppointment(id){const a=state.appointments.find(a=>a.id===id);setState({modal:"appointment",editingId:id,form:{...a}});}
 function saveAppointment(){
@@ -457,9 +484,9 @@ function saveAppointment(){
   if(!f.patientId||!f.date||!f.time||!f.doctor){showToast("Preencha os campos obrigatórios","error");return;}
   if(state.editingId){state.appointments=state.appointments.map(a=>a.id===state.editingId?{...a,...f}:a);showToast("Atendimento atualizado!");}
   else{state.appointments=[...state.appointments,{...f,id:newId()}];showToast("Atendimento criado!");}
-  state.modal=null;render();
+  state.modal=null;saveStorage();render();
 }
-function deleteAppointment(id){state.appointments=state.appointments.filter(a=>a.id!==id);state.modal=null;showToast("Atendimento removido");}
+function deleteAppointment(id){state.appointments=state.appointments.filter(a=>a.id!==id);state.modal=null;saveStorage();showToast("Atendimento removido");}
 
 if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js").catch(()=>{});});}
 render();
